@@ -148,5 +148,5 @@ check MON 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765
 Balance for 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765: 123.456 MON
 ```
 
-Output akan menampilkan saldo MON untuk alamat yang diminta. Jika terjadi error, output akan berisi pesan error yang sesuai.
+The output will display the MON balance for the requested address. If an error occurs, the output will contain the corresponding error message.
 
