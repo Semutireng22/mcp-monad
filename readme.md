@@ -22,7 +22,8 @@ This project provides an MCP server that can be used to interact with the Monad 
 1. Clone this repository:
 
 ```shell
-git clone https://github.com/monad-developers/monad-mcp-tutorial.git
+git clone https://github.com/Semutireng22/mcp-monad.git
+cd mcp-monad
 ```
 
 2. Install dependencies:
