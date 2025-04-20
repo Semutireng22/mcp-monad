@@ -1,36 +1,50 @@
 # Monad MCP Server
 
-This project provides an MCP server that can be used to interact with the Monad testnet. The server supports several main features to check MON balance, other token balances, transaction details, gas price, latest block, and multiple balances on the Monad testnet network.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D16-brightgreen)](https://nodejs.org/)
+
+This project provides an MCP server for seamless interaction with the Monad testnet. It supports querying blockchain data (balances, transactions, gas prices, blocks) and interacting with the CoinflipGame smart contract for playing a coinflip game. The server integrates with Claude Desktop, allowing users to execute commands in natural language.
 
 ## Supported Features
 
-- **get-mon-balance**: Check MON balance for a Monad testnet address.
-- **get-token-balance**: Check a specific ERC-20 token balance for a Monad testnet address.
-- **get-transaction-details**: Get transaction details by transaction hash.
-- **get-gas-price**: Get the current gas price on the Monad testnet.
-- **get-latest-block**: Get the latest block information on the Monad testnet.
-- **get-multiple-balances**: Check balances for multiple addresses at once.
+| Feature | Description | Example Command |
+|---------|-------------|----------------|
+| get-mon-balance | Check the MON balance for a Monad testnet address. | `check MON 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765` |
+| get-token-balance | Check the balance of a specific ERC-20 token for an address. | `check token balance for 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765 on contract 0x1234...5678` |
+| get-transaction-details | Retrieve detailed information about a transaction by its hash. | `get details for transaction 0xabcdef1234567890...` |
+| get-gas-price | Get the current gas price on the Monad testnet. | `what is the current gas price` |
+| get-latest-block | Fetch information about the latest block on the Monad testnet. | `show latest block info` |
+| get-multiple-balances | Check balances for multiple tokens for an address. | `check multiple balances for 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765 on contracts 0x1234...5678, 0x5678...1234` |
+| send-mon | Send MON tokens to a specified address on the Monad testnet. | `send 0.1 MON to 0xb3f57a3A7744eA20B5E2848817e9D66C6cb9f765` |
+| send-token | Send ERC-20 tokens to a specified address from a token contract. | `send 100 USDT to 0xb3f57a3A7744eA20B5E2848817e9D66C6cb9f765 from contract 0x1234...5678` |
+| play-coinflip | Play a coinflip game by betting MON on Heads or Tails (minimum bet: 0.01 MON). | `flip 0.1 mon head` |
+| get-coinflip-history | View the history of coinflip games for an address, including wins, losses, and profit. | `history flip` or `history flip 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765` |
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/Semutireng22/mcp-monad.git
+cd mcp-monad
+
+# Install dependencies
+npm install
+
+# Create .env file (replace with your private key)
+echo "PRIVATE_KEY=0xyourprivatekeyhere" > .env
+
+# Build and run
+npm run build
+node build/index.js
+```
 
 ## Prerequisites
 
 - Node.js (v16 or newer)
-- `npm` or `yarn`
+- npm or yarn
 - Claude Desktop (for MCP Client integration)
-
-## Installation
-
-1. Clone this repository:
-
-```shell
-git clone https://github.com/Semutireng22/mcp-monad.git
-cd mcp-monad
-```
-
-2. Install dependencies:
-
-```shell
-npm install
-```
+- A Monad testnet wallet with sufficient MON for transactions and gas fees (required for play-coinflip, send-mon, and send-token)
+- A `.env` file with a valid `PRIVATE_KEY` for the Monad testnet wallet
 
 ## Configuration and Usage
 
@@ -38,7 +52,7 @@ npm install
 
 In the `src/index.ts` file, the server is initialized with the list of supported features:
 
-```ts
+```typescript
 const server = new McpServer({
   name: "monad-testnet",
   version: "0.0.1",
@@ -48,105 +62,111 @@ const server = new McpServer({
     "get-transaction-details",
     "get-gas-price",
     "get-latest-block",
-    "get-multiple-balances"
+    "get-multiple-balances",
+    "send-mon",
+    "send-token",
+    "play-coinflip",
+    "get-coinflip-history"
   ]
 });
 ```
 
-### Example Implementation of a Feature
+### Setting Up the Environment
 
-For example, for the MON balance check feature:
+Create a `.env` file in the project root directory (e.g., `/path/to/mcp-monad/.env`) with the following content:
 
-```ts
-server.tool(
-  "get-mon-balance",
-  "Get MON balance for an address on Monad testnet",
-  {
-    address: z.string().describe("Monad testnet address to check balance for"),
-  },
-  async ({ address }) => {
-    try {
-      const balance = await publicClient.getBalance({
-        address: address as `0x${string}`,
-      });
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Balance for ${address}: ${formatUnits(balance, 18)} MON`,
-          },
-        ],
-      };
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Failed to retrieve balance for address: ${address}. Error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-      };
-    }
-  }
-);
+```env
+PRIVATE_KEY=0xyourprivatekeyhere
 ```
 
-### Running the Server
+Replace `0xyourprivatekeyhere` with your Monad testnet wallet's private key (64 hexadecimal characters starting with `0x`).
 
-First build the project:
+Ensure the `.env` file is secure and not committed to version control. Add it to `.gitignore`:
 
-```shell
+```bash
+echo .env >> .gitignore
+```
+
+### Building and Running the Server
+
+Build the project:
+
+```bash
 npm run build
 ```
 
 Run the MCP server:
 
-```shell
+```bash
 node build/index.js
 ```
 
 ### Integration with Claude Desktop
 
-1. Open "Claude Desktop".
-2. Go to Settings > Developer.
-3. Edit `claude_desktop_config.json` and add the following configuration:
+1. Open Claude Desktop.
+2. Go to `Settings > Developer`.
+3. Edit `claude_desktop_config.json` (typically located in `~/.config/Claude/` or `%APPDATA%\Claude\`) and add the following configuration:
 
 ```json
 {
   "mcpServers": {
-    ...
     "monad-mcp": {
       "command": "node",
       "args": [
-        "/<path-to-project>/build/index.js"
-      ]
+        "/path/to/mcp-monad/build/index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
     }
   }
 }
 ```
 
-4. Restart "Claude Desktop".
+Replace `/path/to/mcp-monad/` with the actual path to your project directory (e.g., `E:\proyek\mcp-monad` on Windows or `/home/user/mcp-monad` on Linux).
 
-## Reference Sources
+4. Restart Claude Desktop.
+5. When prompted, allow MCP access for the chat session (`Allow for This Chat`).
 
-- [Model Context Protocol Documentation](https://modelcontextprotocol.io/introduction)
-- [Monad Documentation](https://docs.monad.xyz/)
-- [Viem Documentation](https://viem.sh/)
+## Contributing
 
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## Example MCP Prompt Usage
+## License
 
-For example, to check MON balance for a specific address, you can send a request like this:
+Distributed under the MIT License. See `LICENSE` for more information.
 
-**Prompt:**
+## Contact
+
+Slamettttt  - [@caridipesbuk](https://twitter.com/caridipesbuk)
+
+Project Link: [https://github.com/Semutireng22/mcp-monad](https://github.com/Semutireng22/mcp-monad)
+
+## Notes
+
+- Ensure the CoinflipGame contract (`0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b`) has sufficient funds in its pool to cover potential winnings for `play-coinflip`. You can check this using a Monad testnet block explorer.
+- For users on different systems, adjust the project path in `claude_desktop_config.json` accordingly.
+
+## Troubleshooting
+
+- **Server fails to start**: Check logs in Claude Desktop (`Settings > Developer`) or terminal for errors like "File `.env` does not exist." Ensure `.env` is in the project root with a valid `PRIVATE_KEY`.
+- **Insufficient contract funds**: Verify the CoinflipGame contract balance using a block explorer. The contract owner can fund it via the `fundGamePool` function.
+- **Claude commands not working**: Ensure `claude_desktop_config.json` has the correct project path and restart Claude Desktop.
+- **TypeScript errors**: Run `npx tsc` to check for errors. Update dependencies with:
+
+```bash
+npm install
 ```
-check MON 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765
-```
 
-**Output yang diharapkan:**
-```
-Balance for 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765: 123.456 MON
-```
+- **Use MCP Inspector for debugging**:
 
-The output will display the MON balance for the requested address. If an error occurs, the output will contain the corresponding error message.
+```bash
+git clone https://github.com/modelcontextprotocol/inspector
+cd inspector
+npm install
+npm start
 

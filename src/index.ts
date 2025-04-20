@@ -48,7 +48,7 @@ const providers: ethers.providers.JsonRpcProvider[] = rpcUrls.map(url => new eth
 const provider: ethers.providers.FallbackProvider = new ethers.providers.FallbackProvider(providers, 1);
 const wallet: ethers.Wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-// Add ERC20 ABI for token balance checking and sending
+// ABI untuk ERC20 (digunakan di tool lain)
 const ERC20_ABI = [
     {
         inputs: [{ name: "account", type: "address" }],
@@ -93,13 +93,156 @@ const ERC20_ABI = [
     }
 ] as const;
 
+// ABI untuk CoinflipGame
+const COINFLIP_ABI = [
+    {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            { "indexed": true, "internalType": "address", "name": "player", "type": "address" },
+            { "indexed": false, "internalType": "uint256", "name": "bet", "type": "uint256" }
+        ],
+        "name": "BetPlaced",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            { "indexed": true, "internalType": "address", "name": "player", "type": "address" },
+            { "indexed": false, "internalType": "enum CoinflipGame.Choice", "name": "playerChoice", "type": "uint8" },
+            { "indexed": false, "internalType": "bool", "name": "result", "type": "bool" },
+            { "indexed": false, "internalType": "bool", "name": "won", "type": "bool" },
+            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+            { "indexed": false, "internalType": "uint256", "name": "bet", "type": "uint256" },
+            { "indexed": false, "internalType": "bytes32", "name": "requestId", "type": "bytes32" }
+        ],
+        "name": "FlipResult",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            { "indexed": true, "internalType": "address", "name": "depositor", "type": "address" },
+            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+            { "indexed": false, "internalType": "uint256", "name": "toGamePool", "type": "uint256" },
+            { "indexed": false, "internalType": "uint256", "name": "toReserve", "type": "uint256" }
+        ],
+        "name": "FundsDeposited",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
+            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+            { "indexed": false, "internalType": "bool", "name": "toGamePool", "type": "bool" }
+        ],
+        "name": "FundsMoved",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+        ],
+        "name": "FundsWithdrawn",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "MIN_BET",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "contractBalance",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "enum CoinflipGame.Choice", "name": "_choice", "type": "uint8" }],
+        "name": "flipCoin",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "fundGamePool",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "gamePool",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getContractBalance",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getTotalBalance",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
+        "name": "moveFromGamePool",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
+        "name": "moveToGamePool",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "withdrawAllFunds",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "stateMutability": "payable",
+        "type": "receive"
+    }
+] as const;
+
 // Create a public client to interact with the Monad testnet
 const publicClient = createPublicClient({
     chain: monadTestnet,
     transport: http(),
 });
 
-// Update server capabilities
+// Update server capabilities with new tools
 const server: McpServer = new McpServer({
     name: "monad-testnet",
     version: "0.0.1",
@@ -111,7 +254,9 @@ const server: McpServer = new McpServer({
         "get-latest-block",
         "get-multiple-balances",
         "send-mon",
-        "send-token"
+        "send-token",
+        "play-coinflip",
+        "get-coinflip-history"
     ]
 });
 
@@ -516,6 +661,198 @@ server.tool(
                     {
                         type: "text",
                         text: `Failed to send token. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk bermain CoinflipGame
+server.tool(
+    "play-coinflip",
+    "Play a coinflip game on Monad testnet by betting MON on Heads or Tails",
+    {
+        amount: z.string()
+            .regex(/^\d+(\.\d+)?$/, { message: "Invalid amount, must be a positive number" })
+            .describe("Amount to bet in MON (minimum 0.01 MON)"),
+        choice: z.enum(["head", "tail"])
+            .describe("Choose 'head' or 'tail' for the coinflip"),
+    },
+    async ({ amount, choice }: { amount: string; choice: "head" | "tail" }) => {
+        try {
+            // Konversi amount ke wei
+            const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
+            const minBet: ethers.BigNumber = ethers.utils.parseEther("0.01");
+            if (amountWei.lt(minBet)) {
+                throw new Error("Bet must be at least 0.01 MON");
+            }
+
+            // Cek saldo dompet
+            const balance: ethers.BigNumber = await provider.getBalance(wallet.address);
+            if (balance.lt(amountWei)) {
+                throw new Error("Insufficient MON balance for bet and gas");
+            }
+
+            // Inisialisasi kontrak CoinflipGame
+            const contract: ethers.Contract = new ethers.Contract(
+                "0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b",
+                COINFLIP_ABI,
+                wallet
+            );
+
+            // Cek saldo kontrak
+            const totalPool: ethers.BigNumber = await contract.getTotalBalance();
+            const requiredPool: ethers.BigNumber = amountWei.mul(2);
+            if (totalPool.lt(requiredPool)) {
+                throw new Error("Insufficient contract pool to pay potential winnings");
+            }
+
+            // Konversi pilihan ke enum kontrak
+            const choiceEnum: number = choice.toLowerCase() === "head" ? 0 : 1;
+
+            // Estimasi gas dan tambahkan buffer 20%
+            const gasLimit: ethers.BigNumber = await contract.estimateGas.flipCoin(choiceEnum, {
+                value: amountWei,
+            });
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
+
+            // Kirim transaksi flipCoin
+            const tx: ethers.ContractTransaction = await contract.flipCoin(choiceEnum, {
+                value: amountWei,
+                gasLimit: bufferedGasLimit,
+                gasPrice: await provider.getGasPrice(),
+            });
+
+            // Tunggu konfirmasi
+            const receipt: ethers.ContractReceipt = await tx.wait();
+
+            // Parse event FlipResult
+            let resultText: string = "Unknown result";
+            for (const log of receipt.logs) {
+                try {
+                    const parsedLog = contract.interface.parseLog(log);
+                    if (parsedLog.name === "FlipResult") {
+                        const { playerChoice, result, won, amount, bet } = parsedLog.args;
+                        const choiceStr: string = playerChoice === 0 ? "Head" : "Tail";
+                        const resultStr: string = result ? "Head" : "Tail";
+                        const betMon: string = ethers.utils.formatEther(bet);
+                        if (won) {
+                            const winningsMon: string = ethers.utils.formatEther(amount);
+                            resultText = `You chose ${choiceStr}. Result: ${resultStr}. You won! Winnings: ${winningsMon} MON`;
+                        } else {
+                            resultText = `You chose ${choiceStr}. Result: ${resultStr}. You lost. Bet: ${betMon} MON`;
+                        }
+                        break;
+                    }
+                } catch (e) {
+                    // Lanjutkan jika log bukan FlipResult
+                }
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `${resultText}\nTransaction Hash: ${receipt.transactionHash}`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to play coinflip. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk melihat riwayat permainan Coinflip
+server.tool(
+    "get-coinflip-history",
+    "Get the history of coinflip games for an address on Monad testnet",
+    {
+        address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" })
+            .optional()
+            .describe("Address to check game history for (defaults to your wallet address)"),
+        limit: z.number().int().min(1).max(100).optional().default(50)
+            .describe("Maximum number of games to retrieve (1-100, default 50)"),
+    },
+    async ({ address, limit }: { address?: string; limit?: number }) => {
+        try {
+            // Gunakan alamat dompet jika address tidak diberikan
+            const playerAddress: string = address || wallet.address;
+
+            // Inisialisasi kontrak untuk parsing event
+            const contract: ethers.Contract = new ethers.Contract(
+                "0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b",
+                COINFLIP_ABI,
+                provider
+            );
+
+            // Ambil event FlipResult untuk alamat pemain
+            const filter = {
+                address: "0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b",
+                topics: [
+                    contract.interface.getEventTopic("FlipResult"),
+                    ethers.utils.hexZeroPad(playerAddress, 32),
+                ],
+                fromBlock: 0, // Mulai dari blok awal (bisa disesuaikan untuk efisiensi)
+            };
+            const logs = await provider.getLogs(filter);
+
+            // Batasi jumlah log sesuai limit
+            const games = logs.slice(0, limit).map((log) => {
+                const parsedLog = contract.interface.parseLog(log);
+                const { playerChoice, result, won, amount, bet } = parsedLog.args;
+                return {
+                    choice: playerChoice === 0 ? "Head" : "Tail",
+                    result: result ? "Head" : "Tail",
+                    won,
+                    amount: ethers.utils.formatEther(amount),
+                    bet: ethers.utils.formatEther(bet),
+                };
+            });
+
+            // Hitung statistik
+            const totalWins: number = games.filter(g => g.won).length;
+            const totalLosses: number = games.length - totalWins;
+            const totalWinnings: number = games
+                .filter(g => g.won)
+                .reduce((sum, g) => sum + parseFloat(g.amount), 0);
+            const totalBets: number = games
+                .reduce((sum, g) => sum + parseFloat(g.bet), 0);
+            const profit: number = totalWinnings - totalBets;
+
+            // Format riwayat permainan
+            const historyText: string = games.length > 0
+                ? games.map((g, i) => 
+                    `- Game ${i + 1}: Chose ${g.choice}, Result: ${g.result}, ${g.won ? `Won: ${g.amount} MON` : `Lost, Bet: ${g.bet} MON`}`
+                ).join('\n')
+                : "No games found.";
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Coinflip History for ${playerAddress}:\n` +
+                              `Total Wins: ${totalWins}\n` +
+                              `Total Losses: ${totalLosses}\n` +
+                              `Profit: ${profit.toFixed(4)} MON\n` +
+                              `Games:\n${historyText}`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to retrieve coinflip history. Error: ${error instanceof Error ? error.message : String(error)}`,
                     },
                 ],
             };
