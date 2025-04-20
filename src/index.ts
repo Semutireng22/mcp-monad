@@ -10,8 +10,45 @@ import {
     formatEther
 } from "viem";
 import { monadTestnet } from "viem/chains";
+import { ethers } from "ethers";
+import * as dotenv from "dotenv";
+import * as path from "path";
+import * as fs from "fs";
 
-// Add ERC20 ABI for token balance checking
+// Muat file .env dari direktori proyek (relatif terhadap file kode)
+const envPath: string = path.resolve(__dirname, "..", ".env");
+if (!fs.existsSync(envPath)) {
+    console.error(`File ${envPath} does not exist.`);
+    console.error(`Please create ${envPath} with: PRIVATE_KEY=0x... (64 hexadecimal characters starting with 0x).`);
+    console.error(`Current working directory: ${process.cwd()}`);
+    console.error(`Expected .env in project root directory, one level above: ${__dirname}`);
+    throw new Error(`File ${envPath} does not exist`);
+}
+dotenv.config({ path: envPath });
+
+// Validasi private key dari .env
+const PRIVATE_KEY: string | undefined = process.env.PRIVATE_KEY;
+if (!PRIVATE_KEY) {
+    console.error(`PRIVATE_KEY is not set in ${envPath}.`);
+    console.error(`Ensure ${envPath} contains: PRIVATE_KEY=0x... (64 hexadecimal characters starting with 0x).`);
+    throw new Error(`PRIVATE_KEY is not set in ${envPath}`);
+}
+if (!/^0x[a-fA-F0-9]{64}$/.test(PRIVATE_KEY)) {
+    console.error(`Invalid PRIVATE_KEY format in ${envPath}. Must be 0x followed by 64 hexadecimal characters.`);
+    throw new Error("Invalid PRIVATE_KEY format");
+}
+
+// Konfigurasi RPC dengan FallbackProvider
+const rpcUrls: string[] = [
+    monadTestnet.rpcUrls.default.http[0],
+    // Tambahkan RPC alternatif jika tersedia
+    // "https://monad-testnet-alchemy-rpc-url",
+];
+const providers: ethers.providers.JsonRpcProvider[] = rpcUrls.map(url => new ethers.providers.JsonRpcProvider(url));
+const provider: ethers.providers.FallbackProvider = new ethers.providers.FallbackProvider(providers, 1);
+const wallet: ethers.Wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+
+// Add ERC20 ABI for token balance checking and sending
 const ERC20_ABI = [
     {
         inputs: [{ name: "account", type: "address" }],
@@ -43,6 +80,16 @@ const ERC20_ABI = [
         ],
         name: "Transfer",
         type: "event"
+    },
+    {
+        inputs: [
+            { name: "recipient", type: "address" },
+            { name: "amount", type: "uint256" }
+        ],
+        name: "transfer",
+        outputs: [{ name: "", type: "bool" }],
+        stateMutability: "nonpayable",
+        type: "function",
     }
 ] as const;
 
@@ -53,7 +100,7 @@ const publicClient = createPublicClient({
 });
 
 // Update server capabilities
-const server = new McpServer({
+const server: McpServer = new McpServer({
     name: "monad-testnet",
     version: "0.0.1",
     capabilities: [
@@ -62,7 +109,9 @@ const server = new McpServer({
         "get-transaction-details",
         "get-gas-price",
         "get-latest-block",
-        "get-multiple-balances"
+        "get-multiple-balances",
+        "send-mon",
+        "send-token"
     ]
 });
 
@@ -73,7 +122,7 @@ server.tool(
     {
         address: z.string().describe("Monad testnet address to check balance for"),
     },
-    async ({ address }) => {
+    async ({ address }: { address: string }) => {
         try {
             const balance = await publicClient.getBalance({
                 address: address as `0x${string}`,
@@ -86,7 +135,7 @@ server.tool(
                     },
                 ],
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 content: [
                     {
@@ -109,7 +158,7 @@ server.tool(
         address: z.string().describe("Address to check balance for"),
         tokenContract: z.string().describe("Token contract address"),
     },
-    async ({ address, tokenContract }) => {
+    async ({ address, tokenContract }: { address: string; tokenContract: string }) => {
         try {
             const contract = getContract({
                 address: tokenContract as `0x${string}`,
@@ -131,7 +180,7 @@ server.tool(
                     },
                 ],
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 content: [
                     {
@@ -153,20 +202,19 @@ server.tool(
     {
         hash: z.string().describe("Transaction hash to check"),
     },
-    async ({ hash }) => {
+    async ({ hash }: { hash: string }) => {
         try {
             const tx = await publicClient.getTransaction({ hash: hash as `0x${string}` });
             const receipt = await publicClient.getTransactionReceipt({ hash: hash as `0x${string}` });
             const block = await publicClient.getBlock({ blockHash: receipt.blockHash });
             
-            let transactionType = "Native MON Transfer";
-            let from = tx.from;
-            let to = tx.to;
-            let value = tx.value;
-            let tokenSymbol = "MON";
-            let decimals = 18;
+            let transactionType: string = "Native MON Transfer";
+            let from: string = tx.from;
+            let to: string | null = tx.to;
+            let value: bigint = tx.value;
+            let tokenSymbol: string = "MON";
+            let decimals: number = 18;
 
-            // Check if this is a token transfer
             if (receipt.logs.length > 0) {
                 try {
                     const log = receipt.logs[0];
@@ -200,8 +248,8 @@ server.tool(
                 }
             }
 
-            const timestamp = new Date(Number(block.timestamp) * 1000);
-            const formattedValue = transactionType === "Native MON Transfer" 
+            const timestamp: Date = new Date(Number(block.timestamp) * 1000);
+            const formattedValue: string = transactionType === "Native MON Transfer" 
                 ? formatEther(value)
                 : formatUnits(value, decimals);
 
@@ -221,7 +269,7 @@ Gas Used: ${receipt.gasUsed} wei`
                     },
                 ],
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 content: [
                     {
@@ -243,14 +291,14 @@ server.tool(
     {},
     async () => {
         try {
-            const gasPrice = await publicClient.getGasPrice();
+            const gasPrice: bigint = await publicClient.getGasPrice();
             return {
                 content: [{
                     type: "text",
                     text: `Current Gas Price: ${formatUnits(gasPrice, 9)} Gwei`,
                 }],
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 content: [{ 
                     type: "text", 
@@ -269,7 +317,7 @@ server.tool(
     async () => {
         try {
             const block = await publicClient.getBlock();
-            const timestamp = new Date(Number(block.timestamp) * 1000);
+            const timestamp: Date = new Date(Number(block.timestamp) * 1000);
 
             return {
                 content: [{
@@ -284,7 +332,7 @@ Gas Used: ${formatUnits(block.gasUsed, 9)} Gwei
 Gas Limit: ${formatUnits(block.gasLimit, 9)} Gwei`
                 }],
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 content: [{ 
                     type: "text", 
@@ -303,10 +351,10 @@ server.tool(
         address: z.string().describe("Address to check balances for"),
         tokenContracts: z.array(z.string()).describe("Array of token contract addresses"),
     },
-    async ({ address, tokenContracts }) => {
+    async ({ address, tokenContracts }: { address: string; tokenContracts: string[] }) => {
         try {
             const balances = await Promise.all(
-                tokenContracts.map(async (tokenContract) => {
+                tokenContracts.map(async (tokenContract: string) => {
                     const contract = getContract({
                         address: tokenContract as `0x${string}`,
                         abi: ERC20_ABI,
@@ -327,7 +375,7 @@ server.tool(
                 })
             );
 
-            const balanceText = balances
+            const balanceText: string = balances
                 .map(b => `${b.symbol}: ${b.balance} (${b.contract})`)
                 .join('\n');
 
@@ -337,7 +385,7 @@ server.tool(
                     text: `Token Balances for ${address}:\n${balanceText}`,
                 }],
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 content: [{ 
                     type: "text", 
@@ -348,24 +396,150 @@ server.tool(
     }
 );
 
+// Tool untuk mengirim MON (native token)
+server.tool(
+    "send-mon",
+    "Send MON tokens to a specified address on Monad testnet",
+    {
+        toAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" }).describe("Recipient address"),
+        amount: z.string().regex(/^\d+(\.\d+)?$/, { message: "Invalid amount, must be a positive number" }).describe("Amount of MON to send"),
+    },
+    async ({ toAddress, amount }: { toAddress: string; amount: string }) => {
+        try {
+            // Konversi amount ke wei
+            const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
 
+            // Cek saldo MON
+            const balance: ethers.BigNumber = await provider.getBalance(wallet.address);
+            if (balance.lt(amountWei)) {
+                throw new Error("Insufficient MON balance");
+            }
+
+            // Estimasi gas dan tambahkan buffer 20%
+            const gasLimit: ethers.BigNumber = await provider.estimateGas({
+                to: toAddress,
+                value: amountWei,
+            });
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100); // Buffer 20%
+
+            // Kirim transaksi
+            const tx: ethers.providers.TransactionResponse = await wallet.sendTransaction({
+                to: toAddress,
+                value: amountWei,
+                gasLimit: bufferedGasLimit,
+                gasPrice: await provider.getGasPrice(),
+            });
+
+            // Tunggu konfirmasi
+            const receipt: ethers.providers.TransactionReceipt = await tx.wait();
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Successfully sent ${amount} MON to ${receipt.to}\nTransaction Hash: ${receipt.transactionHash}\nStatus: ${receipt.status === 1 ? "Success" : "Failed"}`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to send MON. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk mengirim token ERC-20
+server.tool(
+    "send-token",
+    "Send ERC-20 tokens to a specified address from a token contract",
+    {
+        toAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" }).describe("Recipient address"),
+        tokenContract: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid token contract address" }).describe("Token contract address"),
+        amount: z.string().regex(/^\d+(\.\d+)?$/, { message: "Invalid amount, must be a positive number" }).describe("Amount of tokens to send"),
+    },
+    async ({ toAddress, tokenContract, amount }: { toAddress: string; tokenContract: string; amount: string }) => {
+        try {
+            // Cek apakah kontrak valid
+            const code: string = await provider.getCode(tokenContract);
+            if (code === "0x") {
+                throw new Error("Invalid token contract: no code found");
+            }
+
+            // Buat instance kontrak
+            const contract: ethers.Contract = new ethers.Contract(tokenContract, ERC20_ABI, wallet);
+
+            // Dapatkan decimals dan symbol
+            const [decimals, symbol]: [number, string] = await Promise.all([
+                contract.decimals(),
+                contract.symbol()
+            ]);
+
+            // Konversi amount ke format yang sesuai
+            const amountWei: ethers.BigNumber = ethers.utils.parseUnits(amount, decimals);
+
+            // Cek saldo token
+            const balance: ethers.BigNumber = await contract.balanceOf(wallet.address);
+            if (balance.lt(amountWei)) {
+                throw new Error(`Insufficient ${symbol} balance`);
+            }
+
+            // Estimasi gas dan tambahkan buffer 20%
+            const gasLimit: ethers.BigNumber = await contract.estimateGas.transfer(toAddress, amountWei);
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100); // Buffer 20%
+
+            // Kirim transaksi transfer
+            const tx: ethers.ContractTransaction = await contract.transfer(toAddress, amountWei, {
+                gasLimit: bufferedGasLimit,
+                gasPrice: await provider.getGasPrice(),
+            });
+
+            // Tunggu konfirmasi
+            const receipt: ethers.ContractReceipt = await tx.wait();
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Successfully sent ${amount} ${symbol} to ${receipt.to}\nTransaction Hash: ${receipt.transactionHash}\nStatus: ${receipt.status === 1 ? "Success" : "Failed"}`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to send token. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
 
 /**
  * Main function to start the MCP server
  * Uses stdio for communication with LLM clients
  */
-async function main() {
-    // Create a transport layer using standard input/output
-    const transport = new StdioServerTransport();
-    
-    // Connect the server to the transport
+async function main(): Promise<void> {
+    console.error("Starting MCP server...");
+    console.error("Server process started with args:", process.argv);
+    console.error("Current working directory:", process.cwd());
+    console.error(`Loaded .env from: ${envPath}`);
+    const transport: StdioServerTransport = new StdioServerTransport();
+    console.error("Transport created");
     await server.connect(transport);
-    
     console.error("Monad testnet MCP Server running on stdio");
 }
 
 // Start the server and handle any fatal errors
-main().catch((error) => {
+main().catch((error: unknown) => {
     console.error("Fatal error in main():", error);
     process.exit(1);
 });

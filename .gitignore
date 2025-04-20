@@ -1,3 +1,18 @@
 node_modules/
 build/
 .env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Runtime data
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Coverage directory
+coverage/
