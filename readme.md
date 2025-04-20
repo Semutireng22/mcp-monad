@@ -5,7 +5,7 @@
 
 This project provides an MCP server for seamless interaction with the Monad testnet. It supports querying blockchain data (balances, transactions, gas prices, blocks) and interacting with the CoinflipGame smart contract for playing a coinflip game. The server integrates with Claude Desktop, allowing users to execute commands in natural language.
 
-## Supported Features
+## Supported Features and How To Use
 
 | Feature | Description | Example Command |
 |---------|-------------|----------------|
@@ -19,7 +19,9 @@ This project provides an MCP server for seamless interaction with the Monad test
 | send-token | Send ERC-20 tokens to a specified address from a token contract. | `send 100 USDT to 0xb3f57a3A7744eA20B5E2848817e9D66C6cb9f765 from contract 0x1234...5678` |
 | play-coinflip | Play a coinflip game by betting MON on Heads or Tails (minimum bet: 0.01 MON). | `flip 0.1 mon head` |
 | get-coinflip-history | View the history of coinflip games for an address, including wins, losses, and profit. | `history flip` or `history flip 0xa2e57a3A7744eA20B5E2848817e9D66C6cb9f765` |
-
+| stake-aprmon | Stake your MON tokens in the Apriori staking platform. | `stake 0.1 mon` to stake MON tokens. |
+| unstake-aprmon | Unstake all your MON tokens from the Apriori platform. | `unstake aprmon` to unstake all your staked MON tokens. Note down the request ID, which will be used later for claiming. |
+| claim-aprmon | Claim pending unstaked MON tokens. | After 10 minutes of unstaking, use `claim aprmon requestID`. Replace `requestID` with the ID obtained during the unstaking process. |
 ## Quick Start
 
 ```bash

@@ -14,8 +14,9 @@ import { ethers } from "ethers";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import * as fs from "fs";
+import { ERC20_ABI, COINFLIP_ABI, APRMON_ABI } from "./abis";
 
-// Muat file .env dari direktori proyek (relatif terhadap file kode)
+// Muat file .env dari direktori proyek
 const envPath: string = path.resolve(__dirname, "..", ".env");
 if (!fs.existsSync(envPath)) {
     console.error(`File ${envPath} does not exist.`);
@@ -26,7 +27,7 @@ if (!fs.existsSync(envPath)) {
 }
 dotenv.config({ path: envPath });
 
-// Validasi private key dari .env
+// Validasi private key
 const PRIVATE_KEY: string | undefined = process.env.PRIVATE_KEY;
 if (!PRIVATE_KEY) {
     console.error(`PRIVATE_KEY is not set in ${envPath}.`);
@@ -38,211 +39,30 @@ if (!/^0x[a-fA-F0-9]{64}$/.test(PRIVATE_KEY)) {
     throw new Error("Invalid PRIVATE_KEY format");
 }
 
+// Validasi file abis.js
+const abisPath: string = path.resolve(__dirname, "abis.js");
+if (!fs.existsSync(abisPath)) {
+    console.error(`File ${abisPath} does not exist.`);
+    console.error(`Please create ${abisPath} with ERC20_ABI, COINFLIP_ABI, and APRMON_ABI definitions.`);
+    console.error(`Expected abis.js in: ${__dirname}`);
+    throw new Error(`File ${abisPath} does not exist`);
+}
+
 // Konfigurasi RPC dengan FallbackProvider
 const rpcUrls: string[] = [
     monadTestnet.rpcUrls.default.http[0],
-    // Tambahkan RPC alternatif jika tersedia
-    // "https://monad-testnet-alchemy-rpc-url",
 ];
 const providers: ethers.providers.JsonRpcProvider[] = rpcUrls.map(url => new ethers.providers.JsonRpcProvider(url));
 const provider: ethers.providers.FallbackProvider = new ethers.providers.FallbackProvider(providers, 1);
 const wallet: ethers.Wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-// ABI untuk ERC20 (digunakan di tool lain)
-const ERC20_ABI = [
-    {
-        inputs: [{ name: "account", type: "address" }],
-        name: "balanceOf",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
-        inputs: [],
-        name: "decimals",
-        outputs: [{ name: "", type: "uint8" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
-        inputs: [],
-        name: "symbol",
-        outputs: [{ name: "", type: "string" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
-        anonymous: false,
-        inputs: [
-            { indexed: true, name: "from", type: "address" },
-            { indexed: true, name: "to", type: "address" },
-            { indexed: false, name: "value", type: "uint256" }
-        ],
-        name: "Transfer",
-        type: "event"
-    },
-    {
-        inputs: [
-            { name: "recipient", type: "address" },
-            { name: "amount", type: "uint256" }
-        ],
-        name: "transfer",
-        outputs: [{ name: "", type: "bool" }],
-        stateMutability: "nonpayable",
-        type: "function",
-    }
-] as const;
-
-// ABI untuk CoinflipGame
-const COINFLIP_ABI = [
-    {
-        "inputs": [],
-        "stateMutability": "nonpayable",
-        "type": "constructor"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            { "indexed": true, "internalType": "address", "name": "player", "type": "address" },
-            { "indexed": false, "internalType": "uint256", "name": "bet", "type": "uint256" }
-        ],
-        "name": "BetPlaced",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            { "indexed": true, "internalType": "address", "name": "player", "type": "address" },
-            { "indexed": false, "internalType": "enum CoinflipGame.Choice", "name": "playerChoice", "type": "uint8" },
-            { "indexed": false, "internalType": "bool", "name": "result", "type": "bool" },
-            { "indexed": false, "internalType": "bool", "name": "won", "type": "bool" },
-            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
-            { "indexed": false, "internalType": "uint256", "name": "bet", "type": "uint256" },
-            { "indexed": false, "internalType": "bytes32", "name": "requestId", "type": "bytes32" }
-        ],
-        "name": "FlipResult",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            { "indexed": true, "internalType": "address", "name": "depositor", "type": "address" },
-            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
-            { "indexed": false, "internalType": "uint256", "name": "toGamePool", "type": "uint256" },
-            { "indexed": false, "internalType": "uint256", "name": "toReserve", "type": "uint256" }
-        ],
-        "name": "FundsDeposited",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
-            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
-            { "indexed": false, "internalType": "bool", "name": "toGamePool", "type": "bool" }
-        ],
-        "name": "FundsMoved",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
-            { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-        ],
-        "name": "FundsWithdrawn",
-        "type": "event"
-    },
-    {
-        "inputs": [],
-        "name": "MIN_BET",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "contractBalance",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{ "internalType": "enum CoinflipGame.Choice", "name": "_choice", "type": "uint8" }],
-        "name": "flipCoin",
-        "outputs": [],
-        "stateMutability": "payable",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "fundGamePool",
-        "outputs": [],
-        "stateMutability": "payable",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "gamePool",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "getContractBalance",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "getTotalBalance",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
-        "name": "moveFromGamePool",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
-        "name": "moveToGamePool",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "owner",
-        "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "withdrawAllFunds",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "stateMutability": "payable",
-        "type": "receive"
-    }
-] as const;
-
-// Create a public client to interact with the Monad testnet
+// Create a public client
 const publicClient = createPublicClient({
     chain: monadTestnet,
     transport: http(),
 });
 
-// Update server capabilities with new tools
+// Update server capabilities
 const server: McpServer = new McpServer({
     name: "monad-testnet",
     version: "0.0.1",
@@ -256,11 +76,17 @@ const server: McpServer = new McpServer({
         "send-mon",
         "send-token",
         "play-coinflip",
-        "get-coinflip-history"
+        "get-coinflip-history",
+        "stake-aprmon",
+        "unstake-aprmon",
+        "claim-aprmon",
+        "get-aprmon-balance",
+        "get-aprmon-rate",
+        "get-aprmon-requests"
     ]
 });
 
-// Define the MON balance tool
+// Tool untuk mendapatkan saldo MON
 server.tool(
     "get-mon-balance",
     "Get MON balance for an address on Monad testnet",
@@ -295,7 +121,7 @@ server.tool(
     }
 );
 
-// Add new tool for token balance checking
+// Tool untuk mendapatkan saldo token
 server.tool(
     "get-token-balance",
     "Get token balance for an address from a specific token contract",
@@ -340,7 +166,7 @@ server.tool(
     }
 );
 
-// Add transaction details tool
+// Tool untuk detail transaksi
 server.tool(
     "get-transaction-details",
     "Get detailed information about a transaction",
@@ -389,7 +215,7 @@ server.tool(
                         decimals = tokenDecimals;
                     }
                 } catch (e) {
-                    // If decoding fails, stick with native transfer details
+                    // Jika decoding gagal, gunakan detail transfer native
                 }
             }
 
@@ -429,7 +255,7 @@ Gas Used: ${receipt.gasUsed} wei`
     }
 );
 
-// Add gas price tool
+// Tool untuk harga gas
 server.tool(
     "get-gas-price",
     "Get current gas price on Monad testnet",
@@ -454,7 +280,7 @@ server.tool(
     }
 );
 
-// Add latest block info tool
+// Tool untuk blok terbaru
 server.tool(
     "get-latest-block",
     "Get information about the latest block on Monad testnet",
@@ -488,7 +314,7 @@ Gas Limit: ${formatUnits(block.gasLimit, 9)} Gwei`
     }
 );
 
-// Add multiple token balances tool
+// Tool untuk saldo multiple token
 server.tool(
     "get-multiple-balances",
     "Get balances for multiple tokens at once",
@@ -541,7 +367,7 @@ server.tool(
     }
 );
 
-// Tool untuk mengirim MON (native token)
+// Tool untuk mengirim MON
 server.tool(
     "send-mon",
     "Send MON tokens to a specified address on Monad testnet",
@@ -551,23 +377,18 @@ server.tool(
     },
     async ({ toAddress, amount }: { toAddress: string; amount: string }) => {
         try {
-            // Konversi amount ke wei
             const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
-
-            // Cek saldo MON
             const balance: ethers.BigNumber = await provider.getBalance(wallet.address);
             if (balance.lt(amountWei)) {
                 throw new Error("Insufficient MON balance");
             }
 
-            // Estimasi gas dan tambahkan buffer 20%
             const gasLimit: ethers.BigNumber = await provider.estimateGas({
                 to: toAddress,
                 value: amountWei,
             });
-            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100); // Buffer 20%
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
 
-            // Kirim transaksi
             const tx: ethers.providers.TransactionResponse = await wallet.sendTransaction({
                 to: toAddress,
                 value: amountWei,
@@ -575,7 +396,6 @@ server.tool(
                 gasPrice: await provider.getGasPrice(),
             });
 
-            // Tunggu konfirmasi
             const receipt: ethers.providers.TransactionReceipt = await tx.wait();
 
             return {
@@ -610,41 +430,31 @@ server.tool(
     },
     async ({ toAddress, tokenContract, amount }: { toAddress: string; tokenContract: string; amount: string }) => {
         try {
-            // Cek apakah kontrak valid
             const code: string = await provider.getCode(tokenContract);
             if (code === "0x") {
                 throw new Error("Invalid token contract: no code found");
             }
 
-            // Buat instance kontrak
             const contract: ethers.Contract = new ethers.Contract(tokenContract, ERC20_ABI, wallet);
-
-            // Dapatkan decimals dan symbol
             const [decimals, symbol]: [number, string] = await Promise.all([
                 contract.decimals(),
                 contract.symbol()
             ]);
 
-            // Konversi amount ke format yang sesuai
             const amountWei: ethers.BigNumber = ethers.utils.parseUnits(amount, decimals);
-
-            // Cek saldo token
             const balance: ethers.BigNumber = await contract.balanceOf(wallet.address);
             if (balance.lt(amountWei)) {
                 throw new Error(`Insufficient ${symbol} balance`);
             }
 
-            // Estimasi gas dan tambahkan buffer 20%
             const gasLimit: ethers.BigNumber = await contract.estimateGas.transfer(toAddress, amountWei);
-            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100); // Buffer 20%
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
 
-            // Kirim transaksi transfer
             const tx: ethers.ContractTransaction = await contract.transfer(toAddress, amountWei, {
                 gasLimit: bufferedGasLimit,
                 gasPrice: await provider.getGasPrice(),
             });
 
-            // Tunggu konfirmasi
             const receipt: ethers.ContractReceipt = await tx.wait();
 
             return {
@@ -681,53 +491,42 @@ server.tool(
     },
     async ({ amount, choice }: { amount: string; choice: "head" | "tail" }) => {
         try {
-            // Konversi amount ke wei
             const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
             const minBet: ethers.BigNumber = ethers.utils.parseEther("0.01");
             if (amountWei.lt(minBet)) {
                 throw new Error("Bet must be at least 0.01 MON");
             }
 
-            // Cek saldo dompet
             const balance: ethers.BigNumber = await provider.getBalance(wallet.address);
             if (balance.lt(amountWei)) {
                 throw new Error("Insufficient MON balance for bet and gas");
             }
 
-            // Inisialisasi kontrak CoinflipGame
             const contract: ethers.Contract = new ethers.Contract(
                 "0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b",
                 COINFLIP_ABI,
                 wallet
             );
 
-            // Cek saldo kontrak
             const totalPool: ethers.BigNumber = await contract.getTotalBalance();
             const requiredPool: ethers.BigNumber = amountWei.mul(2);
             if (totalPool.lt(requiredPool)) {
                 throw new Error("Insufficient contract pool to pay potential winnings");
             }
 
-            // Konversi pilihan ke enum kontrak
             const choiceEnum: number = choice.toLowerCase() === "head" ? 0 : 1;
-
-            // Estimasi gas dan tambahkan buffer 20%
             const gasLimit: ethers.BigNumber = await contract.estimateGas.flipCoin(choiceEnum, {
                 value: amountWei,
             });
             const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
 
-            // Kirim transaksi flipCoin
             const tx: ethers.ContractTransaction = await contract.flipCoin(choiceEnum, {
                 value: amountWei,
                 gasLimit: bufferedGasLimit,
                 gasPrice: await provider.getGasPrice(),
             });
 
-            // Tunggu konfirmasi
             const receipt: ethers.ContractReceipt = await tx.wait();
-
-            // Parse event FlipResult
             let resultText: string = "Unknown result";
             for (const log of receipt.logs) {
                 try {
@@ -771,7 +570,7 @@ server.tool(
     }
 );
 
-// Tool untuk melihat riwayat permainan Coinflip
+// Tool untuk melihat riwayat Coinflip
 server.tool(
     "get-coinflip-history",
     "Get the history of coinflip games for an address on Monad testnet",
@@ -784,28 +583,27 @@ server.tool(
     },
     async ({ address, limit }: { address?: string; limit?: number }) => {
         try {
-            // Gunakan alamat dompet jika address tidak diberikan
             const playerAddress: string = address || wallet.address;
-
-            // Inisialisasi kontrak untuk parsing event
             const contract: ethers.Contract = new ethers.Contract(
                 "0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b",
                 COINFLIP_ABI,
                 provider
             );
 
-            // Ambil event FlipResult untuk alamat pemain
+            const latestBlock = await provider.getBlockNumber();
+            const fromBlock = Math.max(0, latestBlock - 1000);
+
             const filter = {
                 address: "0x664e248c39cd70Fa333E9b2544beEd6A7a2De09b",
                 topics: [
                     contract.interface.getEventTopic("FlipResult"),
                     ethers.utils.hexZeroPad(playerAddress, 32),
                 ],
-                fromBlock: 0, // Mulai dari blok awal (bisa disesuaikan untuk efisiensi)
+                fromBlock: fromBlock,
+                toBlock: "latest"
             };
             const logs = await provider.getLogs(filter);
 
-            // Batasi jumlah log sesuai limit
             const games = logs.slice(0, limit).map((log) => {
                 const parsedLog = contract.interface.parseLog(log);
                 const { playerChoice, result, won, amount, bet } = parsedLog.args;
@@ -818,7 +616,6 @@ server.tool(
                 };
             });
 
-            // Hitung statistik
             const totalWins: number = games.filter(g => g.won).length;
             const totalLosses: number = games.length - totalWins;
             const totalWinnings: number = games
@@ -828,12 +625,11 @@ server.tool(
                 .reduce((sum, g) => sum + parseFloat(g.bet), 0);
             const profit: number = totalWinnings - totalBets;
 
-            // Format riwayat permainan
             const historyText: string = games.length > 0
                 ? games.map((g, i) => 
                     `- Game ${i + 1}: Chose ${g.choice}, Result: ${g.result}, ${g.won ? `Won: ${g.amount} MON` : `Lost, Bet: ${g.bet} MON`}`
                 ).join('\n')
-                : "No games found.";
+                : "No games found in the recent block range.";
 
             return {
                 content: [
@@ -860,6 +656,421 @@ server.tool(
     }
 );
 
+// Tool untuk stake aprMON
+server.tool(
+    "stake-aprmon",
+    "Stake MON to receive aprMON tokens on Monad testnet",
+    {
+        amount: z.string()
+            .regex(/^\d+(\.\d+)?$/, { message: "Invalid amount, must be a positive number" })
+            .describe("Amount of MON to stake (e.g., 1.0)"),
+        receiver: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" })
+            .optional()
+            .describe("Address to receive aprMON tokens (defaults to your wallet address)")
+    },
+    async ({ amount, receiver }: { amount: string; receiver?: string }) => {
+        try {
+            const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
+            const balance: ethers.BigNumber = await provider.getBalance(wallet.address);
+            if (balance.lt(amountWei)) {
+                throw new Error("Insufficient MON balance for staking and gas");
+            }
+
+            const contract: ethers.Contract = new ethers.Contract(
+                "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A",
+                APRMON_ABI,
+                wallet
+            );
+
+            const receiverAddress: string = receiver || wallet.address;
+            const gasLimit: ethers.BigNumber = await contract.estimateGas.deposit(amountWei, receiverAddress, {
+                value: amountWei
+            });
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
+
+            const tx: ethers.ContractTransaction = await contract.deposit(amountWei, receiverAddress, {
+                value: amountWei,
+                gasLimit: bufferedGasLimit,
+                gasPrice: await provider.getGasPrice(),
+            });
+
+            const receipt: ethers.ContractReceipt = await tx.wait();
+            let sharesReceived: string = "0";
+            for (const log of receipt.logs) {
+                try {
+                    const parsedLog = contract.interface.parseLog(log);
+                    if (parsedLog.name === "Deposit") {
+                        sharesReceived = ethers.utils.formatEther(parsedLog.args.shares);
+                        break;
+                    }
+                } catch (e) {
+                    // Lanjutkan jika log bukan Deposit
+                }
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Successfully staked ${amount} MON. Received ${sharesReceived} aprMON.\nTransaction Hash: ${receipt.transactionHash}`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to stake aprMON. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk unstake aprMON
+server.tool(
+    "unstake-aprmon",
+    "Request withdrawal of aprMON tokens on Monad testnet",
+    {
+        amount: z.string()
+            .regex(/^\d+(\.\d+)?$/, { message: "Invalid amount, must be a positive number" })
+            .describe("Amount of aprMON to withdraw (e.g., 1.0)"),
+        controller: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" })
+            .optional()
+            .describe("Address to control the withdrawal (defaults to your wallet address)")
+    },
+    async ({ amount, controller }: { amount: string; controller?: string }) => {
+        try {
+            const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
+            const contract: ethers.Contract = new ethers.Contract(
+                "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A",
+                APRMON_ABI,
+                wallet
+            );
+
+            const balance: ethers.BigNumber = await contract.balanceOf(wallet.address);
+            if (balance.lt(amountWei)) {
+                throw new Error("Insufficient aprMON balance");
+            }
+
+            const controllerAddress: string = controller || wallet.address;
+            const gasLimit: ethers.BigNumber = await contract.estimateGas.requestRedeem(
+                amountWei,
+                controllerAddress,
+                wallet.address
+            );
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
+
+            const tx: ethers.ContractTransaction = await contract.requestRedeem(
+                amountWei,
+                controllerAddress,
+                wallet.address,
+                {
+                    gasLimit: bufferedGasLimit,
+                    gasPrice: await provider.getGasPrice(),
+                }
+            );
+
+            const receipt: ethers.ContractReceipt = await tx.wait();
+            let requestId: string = "0";
+            for (const log of receipt.logs) {
+                try {
+                    const parsedLog = contract.interface.parseLog(log);
+                    if (parsedLog.name === "RedeemRequest") {
+                        requestId = parsedLog.args.requestId.toString();
+                        break;
+                    }
+                } catch (e) {
+                    // Lanjutkan jika log bukan RedeemRequest
+                }
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Unstake request submitted successfully.\n` +
+                              `Request ID: ${requestId}\n` +
+                              `Transaction Hash: ${receipt.transactionHash}\n` +
+                              `Wait 10 minutes to claim with 'claim aprmon' using the Request ID above.`
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to request unstake aprMON. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk klaim aprMON
+server.tool(
+    "claim-aprmon",
+    "Claim MON tokens from a specific aprMON withdrawal request on Monad testnet",
+    {
+        requestId: z.number().int().min(1, { message: "Request ID must be a positive integer" })
+            .describe("Request ID of the withdrawal to claim"),
+        receiver: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" })
+            .optional()
+            .describe("Address to receive MON tokens (defaults to your wallet address)")
+    },
+    async ({ requestId, receiver }: { requestId: number; receiver?: string }) => {
+        try {
+            const contract: ethers.Contract = new ethers.Contract(
+                "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A",
+                APRMON_ABI,
+                wallet
+            );
+
+            // Periksa apakah permintaan masih tertunda
+            const shares: ethers.BigNumber = await contract.pendingRedeemRequest(requestId, wallet.address);
+            if (shares.eq(0)) {
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `No pending aprMON redeem request found for Request ID ${requestId}. It may have been claimed or does not exist.`,
+                        },
+                    ],
+                };
+            }
+
+            const receiverAddress: string = receiver || wallet.address;
+            const gasLimit: ethers.BigNumber = await contract.estimateGas.redeem(requestId, receiverAddress);
+            const bufferedGasLimit: ethers.BigNumber = gasLimit.mul(120).div(100);
+
+            const tx: ethers.ContractTransaction = await contract.redeem(requestId, receiverAddress, {
+                gasLimit: bufferedGasLimit,
+                gasPrice: await provider.getGasPrice(),
+            });
+
+            const receipt: ethers.ContractReceipt = await tx.wait();
+            let assetsClaimed: string = "0";
+            let fee: string = "0";
+            for (const log of receipt.logs) {
+                try {
+                    const parsedLog = contract.interface.parseLog(log);
+                    if (parsedLog.name === "Redeem") {
+                        assetsClaimed = ethers.utils.formatEther(parsedLog.args.assets);
+                        fee = ethers.utils.formatEther(parsedLog.args.fee);
+                        break;
+                    }
+                } catch (e) {
+                    // Lanjutkan jika log bukan Redeem
+                }
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Successfully claimed ${assetsClaimed} MON for Request ID ${requestId}.\n` +
+                              `Fee: ${fee} MON\n` +
+                              `Transaction Hash: ${receipt.transactionHash}`
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to claim aprMON for Request ID ${requestId}. ` +
+                              `Error: ${error instanceof Error ? error.message : String(error)}`
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk mendapatkan saldo aprMON
+server.tool(
+    "get-aprmon-balance",
+    "Get aprMON balance for an address on Monad testnet",
+    {
+        address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" })
+            .optional()
+            .describe("Address to check aprMON balance for (defaults to your wallet address)")
+    },
+    async ({ address }: { address?: string }) => {
+        try {
+            const checkAddress: string = address || wallet.address;
+            const contract = getContract({
+                address: "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A" as `0x${string}`,
+                abi: APRMON_ABI,
+                client: publicClient,
+            });
+
+            const balance = await contract.read.balanceOf([checkAddress as `0x${string}`]);
+            const assets = await contract.read.convertToAssets([balance]);
+
+            const balanceMon: string = formatUnits(balance, 18);
+            const assetsMon: string = formatUnits(assets, 18);
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Your aprMON balance: ${balanceMon} aprMON (worth ${assetsMon} MON)`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to retrieve aprMON balance. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk mendapatkan rasio pertukaran aprMON
+server.tool(
+    "get-aprmon-rate",
+    "Get the current aprMON/MON exchange rate on Monad testnet",
+    {
+        amount: z.string()
+            .regex(/^\d+(\.\d+)?$/, { message: "Invalid amount, must be a positive number" })
+            .optional()
+            .describe("Amount to calculate rate for (default is 1)")
+    },
+    async ({ amount = "1" }: { amount?: string }) => {
+        try {
+            const amountWei: ethers.BigNumber = ethers.utils.parseEther(amount);
+            const amountBigInt: bigint = BigInt(amountWei.toString());
+            const contract = getContract({
+                address: "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A" as `0x${string}`,
+                abi: APRMON_ABI,
+                client: publicClient,
+            });
+
+            const assets = await contract.read.convertToAssets([amountBigInt]);
+            const shares = await contract.read.convertToShares([amountBigInt]);
+
+            const assetsMon: string = formatUnits(assets, 18);
+            const sharesMon: string = formatUnits(shares, 18);
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Current aprMON rate: ${amount} aprMON = ${assetsMon} MON, ${amount} MON = ${sharesMon} aprMON`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to retrieve aprMON rate. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
+// Tool untuk mendapatkan daftar permintaan redeem aprMON
+server.tool(
+    "get-aprmon-requests",
+    "Get list of pending aprMON redeem requests for an address on Monad testnet",
+    {
+        address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" })
+            .optional()
+            .describe("Address to check redeem requests for (defaults to your wallet address)"),
+        limit: z.number().int().min(1).max(100).optional().default(50)
+            .describe("Maximum number of requests to retrieve (1-100, default 50)")
+    },
+    async ({ address, limit }: { address?: string; limit?: number }) => {
+        try {
+            const checkAddress: string = address || wallet.address;
+            const contract: ethers.Contract = new ethers.Contract(
+                "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A",
+                APRMON_ABI,
+                provider
+            );
+
+            // Ambil blok terbaru dan tetapkan rentang untuk getLogs
+            const latestBlock = await provider.getBlockNumber();
+            const fromBlock = Math.max(0, latestBlock - 1000);
+
+            // Ambil event RedeemRequest
+            const filter = {
+                address: "0xb2f82D0f38dc453D596Ad40A37799446Cc89274A",
+                topics: [
+                    contract.interface.getEventTopic("RedeemRequest"),
+                    null,
+                    ethers.utils.hexZeroPad(checkAddress, 32),
+                ],
+                fromBlock: fromBlock,
+                toBlock: "latest"
+            };
+            const logs = await provider.getLogs(filter);
+
+            // Filter permintaan yang masih tertunda
+            const pendingRequests: { requestId: number; shares: string; created: string }[] = [];
+            for (const log of logs.slice(0, limit)) {
+                try {
+                    const parsedLog = contract.interface.parseLog(log);
+                    if (parsedLog.name === "RedeemRequest") {
+                        const requestId = Number(parsedLog.args.requestId);
+                        const shares: ethers.BigNumber = await contract.pendingRedeemRequest(requestId, checkAddress);
+                        if (!shares.eq(0)) {
+                            const block = await provider.getBlock(log.blockNumber);
+                            const timestamp = new Date(block.timestamp * 1000).toLocaleString();
+                            pendingRequests.push({
+                                requestId,
+                                shares: ethers.utils.formatEther(shares),
+                                created: timestamp,
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // Lanjutkan jika log tidak valid
+                }
+            }
+
+            const requestText: string = pendingRequests.length > 0
+                ? pendingRequests
+                    .map(r => `- Request ID: ${r.requestId}, Amount: ${r.shares} aprMON, Created: ${r.created}`)
+                    .join('\n')
+                : "No pending redeem requests found in the recent block range.";
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Pending aprMON redeem requests for ${checkAddress}:\n${requestText}\nTotal: ${pendingRequests.length} requests`,
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to retrieve aprMON redeem requests. Error: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                ],
+            };
+        }
+    }
+);
+
 /**
  * Main function to start the MCP server
  * Uses stdio for communication with LLM clients
@@ -869,6 +1080,7 @@ async function main(): Promise<void> {
     console.error("Server process started with args:", process.argv);
     console.error("Current working directory:", process.cwd());
     console.error(`Loaded .env from: ${envPath}`);
+    console.error(`Loaded abis from: ${abisPath}`);
     const transport: StdioServerTransport = new StdioServerTransport();
     console.error("Transport created");
     await server.connect(transport);
