@@ -39,6 +39,26 @@ export const ERC20_ABI = [
         outputs: [{ name: "", type: "bool" }],
         stateMutability: "nonpayable",
         type: "function",
+    },
+    {
+        inputs: [
+            { name: "spender", type: "address" },
+            { name: "amount", type: "uint256" }
+        ],
+        name: "approve",
+        outputs: [{ name: "", type: "bool" }],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [
+            { name: "owner", type: "address" },
+            { name: "spender", type: "address" }
+        ],
+        name: "allowance",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function"
     }
 ] as const;
 
@@ -179,5 +199,100 @@ export const APRMON_ABI = [
             { name: "fee", type: "uint256", indexed: false, internalType: "uint256" }
         ],
         anonymous: false
+    }
+] as const;
+
+export const UNISWAP_ROUTER_ABI = [
+    {
+        inputs: [
+            { internalType: "uint256", name: "amountIn", type: "uint256" },
+            { internalType: "uint256", name: "amountOutMin", type: "uint256" },
+            { internalType: "address[]", name: "path", type: "address[]" },
+            { internalType: "address", name: "to", type: "address" },
+            { internalType: "uint256", name: "deadline", type: "uint256" }
+        ],
+        name: "swapExactTokensForTokens",
+        outputs: [{ internalType: "uint256[]", name: "amounts", type: "uint256[]" }],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [
+            { internalType: "uint256", name: "amountOutMin", type: "uint256" },
+            { internalType: "address[]", name: "path", type: "address[]" },
+            { internalType: "address", name: "to", type: "address" },
+            { internalType: "uint256", name: "deadline", type: "uint256" }
+        ],
+        name: "swapExactETHForTokens",
+        outputs: [{ internalType: "uint256[]", name: "amounts", type: "uint256[]" }],
+        stateMutability: "payable",
+        type: "function"
+    },
+    {
+        inputs: [
+            { internalType: "uint256", name: "amountIn", type: "uint256" },
+            { internalType: "uint256", name: "amountOutMin", type: "uint256" },
+            { internalType: "address[]", name: "path", type: "address[]" },
+            { internalType: "address", name: "to", type: "address" },
+            { internalType: "uint256", name: "deadline", type: "uint256" }
+        ],
+        name: "swapExactTokensForETH",
+        outputs: [{ internalType: "uint256[]", name: "amounts", type: "uint256[]" }],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [
+            { internalType: "uint256", name: "amountIn", type: "uint256" },
+            { internalType: "address[]", name: "path", type: "address[]" }
+        ],
+        name: "getAmountsOut",
+        outputs: [{ internalType: "uint256[]", name: "amounts", type: "uint256[]" }],
+        stateMutability: "view",
+        type: "function"
+    }
+] as const;
+
+export const UNISWAP_FACTORY_ABI = [
+    {
+        inputs: [
+            { internalType: "address", name: "tokenA", type: "address" },
+            { internalType: "address", name: "tokenB", type: "address" }
+        ],
+        name: "getPair",
+        outputs: [{ internalType: "address", name: "pair", type: "address" }],
+        stateMutability: "view",
+        type: "function"
+    }
+] as const;
+
+export const UNISWAP_PAIR_ABI = [
+    {
+        inputs: [],
+        name: "getReserves",
+        outputs: [
+            { internalType: "uint112", name: "_reserve0", type: "uint112" },
+            { internalType: "uint112", name: "_reserve1", type: "uint112" },
+            { internalType: "uint32", name: "_blockTimestampLast", type: "uint32" }
+        ],
+        stateMutability: "view",
+        type: "function"
+    }
+] as const;
+
+export const WMON_ABI = [
+    {
+        inputs: [],
+        name: "deposit",
+        outputs: [],
+        stateMutability: "payable",
+        type: "function"
+    },
+    {
+        inputs: [{ internalType: "uint256", name: "amount", type: "uint256" }],
+        name: "withdraw",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function"
     }
 ] as const;

@@ -14,7 +14,8 @@ import { ethers } from "ethers";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import * as fs from "fs";
-import { ERC20_ABI, COINFLIP_ABI, APRMON_ABI } from "./abis";
+import { ERC20_ABI, COINFLIP_ABI, APRMON_ABI, UNISWAP_ROUTER_ABI, UNISWAP_FACTORY_ABI, UNISWAP_PAIR_ABI, WMON_ABI } from "./abis";
+import { TOKEN_LIST } from "./tokens";
 
 // Muat file .env dari direktori proyek
 const envPath: string = path.resolve(__dirname, "..", ".env");
@@ -39,13 +40,29 @@ if (!/^0x[a-fA-F0-9]{64}$/.test(PRIVATE_KEY)) {
     throw new Error("Invalid PRIVATE_KEY format");
 }
 
-// Validasi file abis.js
+// Validasi alamat Uniswap
+const UNISWAP_ROUTER_ADDRESS: string = process.env.UNISWAP_ROUTER_ADDRESS!;
+const UNISWAP_FACTORY_ADDRESS: string = process.env.UNISWAP_FACTORY_ADDRESS!;
+const WMON_ADDRESS: string = process.env.WMON_ADDRESS!;
+if (!UNISWAP_ROUTER_ADDRESS || !UNISWAP_FACTORY_ADDRESS || !WMON_ADDRESS) {
+    console.error(`UNISWAP_ROUTER_ADDRESS, UNISWAP_FACTORY_ADDRESS, and WMON_ADDRESS must be set in ${envPath}.`);
+    throw new Error("Missing Uniswap configuration in .env");
+}
+
+// Validasi file abis.js dan tokens.ts
 const abisPath: string = path.resolve(__dirname, "abis.js");
+const tokensPath: string = path.resolve(__dirname, "tokens.js");
 if (!fs.existsSync(abisPath)) {
     console.error(`File ${abisPath} does not exist.`);
-    console.error(`Please create ${abisPath} with ERC20_ABI, COINFLIP_ABI, and APRMON_ABI definitions.`);
+    console.error(`Please create ${abisPath} with ERC20_ABI, COINFLIP_ABI, APRMON_ABI, UNISWAP_ROUTER_ABI, UNISWAP_FACTORY_ABI, UNISWAP_PAIR_ABI, and WMON_ABI definitions.`);
     console.error(`Expected abis.js in: ${__dirname}`);
     throw new Error(`File ${abisPath} does not exist`);
+}
+if (!fs.existsSync(tokensPath)) {
+    console.error(`File ${tokensPath} does not exist.`);
+    console.error(`Please create ${tokensPath} with TOKEN_LIST definition.`);
+    console.error(`Expected tokens.js in: ${__dirname}`);
+    throw new Error(`File ${tokensPath} does not exist`);
 }
 
 // Konfigurasi RPC dengan FallbackProvider
@@ -82,7 +99,8 @@ const server: McpServer = new McpServer({
         "claim-aprmon",
         "get-aprmon-balance",
         "get-aprmon-rate",
-        "get-aprmon-requests"
+        "get-aprmon-requests",
+        "swap"
     ]
 });
 
@@ -259,7 +277,8 @@ Gas Used: ${receipt.gasUsed} wei`
 server.tool(
     "get-gas-price",
     "Get current gas price on Monad testnet",
-    {},
+    {
+    },
     async () => {
         try {
             const gasPrice: bigint = await publicClient.getGasPrice();
@@ -284,7 +303,8 @@ server.tool(
 server.tool(
     "get-latest-block",
     "Get information about the latest block on Monad testnet",
-    {},
+    {
+    },
     async () => {
         try {
             const block = await publicClient.getBlock();
@@ -1071,6 +1091,247 @@ server.tool(
     }
 );
 
+// Tool untuk swap token
+server.tool(
+    "swap",
+    "Swap tokens or MON on Uniswap V2 on Monad testnet",
+    {
+        amount: z.string().regex(/^\d+(\.\d+)?%?$/, { message: "Invalid amount, must be a positive number or percentage (e.g., '0.1' or '50%')" })
+            .describe("Amount to swap (e.g., '0.1' or '50%')"),
+        tokenIn: z.string().optional()
+            .describe("Input token address or name (e.g., 'MON', 'WMON', 'WETH'), defaults to MON"),
+        tokenOut: z.string().describe("Output token address or name (e.g., 'MON', 'WMON', 'WETH', or contract address like '0x...')"),
+        slippage: z.number().min(0).max(10).optional()
+            .describe("Slippage percentage (0-10, default: 1%)")
+    },
+    async ({ amount, tokenIn, tokenOut, slippage }: { amount: string; tokenIn?: string; tokenOut: string; slippage?: number }) => {
+        try {
+            // Resolusi tokenIn dan tokenOut
+            let tokenInAddress: string = TOKEN_LIST.MON; // Default ke MON
+            let tokenOutAddress: string;
+            let tokenInName: string = "MON";
+            let tokenOutName: string = tokenOut;
+
+            // Proses tokenIn
+            if (tokenIn) {
+                if (/^0x[a-fA-F0-9]{40}$/.test(tokenIn)) {
+                    tokenInAddress = ethers.utils.getAddress(tokenIn);
+                    const code = await provider.getCode(tokenInAddress);
+                    if (code === "0x") {
+                        throw new Error(`Invalid tokenIn contract: ${tokenIn}. No code found.`);
+                    }
+                    const contract = new ethers.Contract(tokenInAddress, ERC20_ABI, provider);
+                    tokenInName = await contract.symbol();
+                } else {
+                    const address = TOKEN_LIST[tokenIn.toUpperCase()];
+                    if (!address) {
+                        throw new Error(`Invalid tokenIn: ${tokenIn}. Use token address or supported name (MON, WMON, WETH).`);
+                    }
+                    tokenInAddress = address;
+                    tokenInName = tokenIn.toUpperCase();
+                }
+            }
+
+            // Proses tokenOut
+            if (/^0x[a-fA-F0-9]{40}$/.test(tokenOut)) {
+                tokenOutAddress = ethers.utils.getAddress(tokenOut);
+                const code = await provider.getCode(tokenOutAddress);
+                if (code === "0x") {
+                    throw new Error(`Invalid tokenOut contract: ${tokenOut}. No code found.`);
+                }
+                const contract = new ethers.Contract(tokenOutAddress, ERC20_ABI, provider);
+                tokenOutName = await contract.symbol();
+            } else {
+                const address = TOKEN_LIST[tokenOut.toUpperCase()];
+                if (!address) {
+                    throw new Error(`Invalid tokenOut: ${tokenOut}. Use token address or supported name (MON, WMON, WETH).`);
+                }
+                tokenOutAddress = address;
+                tokenOutName = tokenOut.toUpperCase();
+            }
+
+            // Validasi tokenIn dan tokenOut tidak sama
+            if (tokenInAddress.toLowerCase() === tokenOutAddress.toLowerCase()) {
+                throw new Error("Cannot swap a token with itself");
+            }
+
+            // Proses jumlah
+            let amountWei: ethers.BigNumber;
+            if (amount.endsWith("%")) {
+                const percentage = parseFloat(amount.slice(0, -1)) / 100;
+                if (isNaN(percentage) || percentage <= 0 || percentage > 1) {
+                    throw new Error("Invalid percentage, must be between 0% and 100%");
+                }
+                if (tokenInAddress === TOKEN_LIST.MON) {
+                    const balance = await provider.getBalance(wallet.address);
+                    amountWei = balance.mul(Math.floor(percentage * 10000)).div(10000);
+                } else {
+                    const contract = new ethers.Contract(tokenInAddress, ERC20_ABI, wallet);
+                    const balance = await contract.balanceOf(wallet.address);
+                    amountWei = balance.mul(Math.floor(percentage * 10000)).div(10000);
+                }
+            } else {
+                if (tokenInAddress === TOKEN_LIST.MON) {
+                    amountWei = ethers.utils.parseEther(amount);
+                } else {
+                    const contract = new ethers.Contract(tokenInAddress, ERC20_ABI, wallet);
+                    const decimals = await contract.decimals();
+                    amountWei = ethers.utils.parseUnits(amount, decimals);
+                }
+            }
+
+            // Validasi saldo
+            if (tokenInAddress === TOKEN_LIST.MON) {
+                const balance = await provider.getBalance(wallet.address);
+                if (balance.lt(amountWei)) {
+                    throw new Error(`Insufficient MON balance: ${ethers.utils.formatEther(balance)} MON available`);
+                }
+            } else {
+                const contract = new ethers.Contract(tokenInAddress, ERC20_ABI, wallet);
+                const balance = await contract.balanceOf(wallet.address);
+                if (balance.lt(amountWei)) {
+                    throw new Error(`Insufficient ${tokenInName} balance: ${ethers.utils.formatUnits(balance, await contract.decimals())} ${tokenInName} available`);
+                }
+            }
+
+            // Periksa pasangan perdagangan
+            const factory = new ethers.Contract(UNISWAP_FACTORY_ADDRESS, UNISWAP_FACTORY_ABI, provider);
+            const pairAddress = await factory.getPair(
+                tokenInAddress === TOKEN_LIST.MON ? WMON_ADDRESS : tokenInAddress,
+                tokenOutAddress === TOKEN_LIST.MON ? WMON_ADDRESS : tokenOutAddress
+            );
+            if (pairAddress === "0x0000000000000000000000000000000000000000") {
+                throw new Error(`No trading pair exists for ${tokenInName}/${tokenOutName}`);
+            }
+
+            // Periksa likuiditas
+            const pairContract = new ethers.Contract(pairAddress, UNISWAP_PAIR_ABI, provider);
+            const reserves = await pairContract.getReserves();
+            if (reserves[0].eq(0) || reserves[1].eq(0)) {
+                throw new Error(`Insufficient liquidity for ${tokenInName}/${tokenOutName}`);
+            }
+
+            // Siapkan Uniswap Router
+            const router = new ethers.Contract(UNISWAP_ROUTER_ADDRESS, UNISWAP_ROUTER_ABI, wallet);
+            const deadline = Math.floor(Date.now() / 1000) + 300; // 5 menit
+            const path = [
+                tokenInAddress === TOKEN_LIST.MON ? WMON_ADDRESS : tokenInAddress,
+                tokenOutAddress === TOKEN_LIST.MON ? WMON_ADDRESS : tokenOutAddress
+            ];
+
+            // Hitung amountOutMin
+            const effectiveSlippage = slippage !== undefined ? slippage : 1; // Default 1%
+            let amountOut: ethers.BigNumber;
+            try {
+                amountOut = (await router.getAmountsOut(amountWei, path))[1];
+            } catch (error: unknown) {
+                throw new Error(`Failed to get amounts out: ${error instanceof Error ? error.message : String(error)}`);
+            }
+            const amountOutMin = amountOut.mul(100 - effectiveSlippage * 100).div(100);
+
+            // Lakukan approve jika tokenIn bukan MON
+            let approvalTxHash: string | null = null;
+            if (tokenInAddress !== TOKEN_LIST.MON) {
+                const contract = new ethers.Contract(tokenInAddress, ERC20_ABI, wallet);
+                const allowance = await contract.allowance(wallet.address, UNISWAP_ROUTER_ADDRESS);
+                if (allowance.lt(amountWei)) {
+                    const gasLimit = (await contract.estimateGas.approve(UNISWAP_ROUTER_ADDRESS, amountWei)).mul(120).div(100);
+                    const tx = await contract.approve(UNISWAP_ROUTER_ADDRESS, amountWei, { gasLimit });
+                    const receipt = await tx.wait();
+                    approvalTxHash = receipt.transactionHash;
+                }
+            }
+
+            // Hitung saldo sebelum swap
+            let balanceBefore: ethers.BigNumber;
+            if (tokenOutAddress === TOKEN_LIST.MON) {
+                balanceBefore = await provider.getBalance(wallet.address);
+            } else {
+                const contract = new ethers.Contract(tokenOutAddress, ERC20_ABI, provider);
+                balanceBefore = await contract.balanceOf(wallet.address);
+            }
+
+            // Lakukan swap
+            let tx: ethers.ContractTransaction;
+            let swapFunction: string;
+            if (tokenInAddress === TOKEN_LIST.MON) {
+                swapFunction = "swapExactETHForTokens";
+                tx = await router[swapFunction](
+                    amountOutMin,
+                    path,
+                    wallet.address,
+                    deadline,
+                    { value: amountWei, gasLimit: (await router.estimateGas[swapFunction](amountOutMin, path, wallet.address, deadline, { value: amountWei })).mul(120).div(100) }
+                );
+            } else if (tokenOutAddress === TOKEN_LIST.MON) {
+                swapFunction = "swapExactTokensForETH";
+                tx = await router[swapFunction](
+                    amountWei,
+                    amountOutMin,
+                    path,
+                    wallet.address,
+                    deadline,
+                    { gasLimit: (await router.estimateGas[swapFunction](amountWei, amountOutMin, path, wallet.address, deadline)).mul(120).div(100) }
+                );
+            } else {
+                swapFunction = "swapExactTokensForTokens";
+                tx = await router[swapFunction](
+                    amountWei,
+                    amountOutMin,
+                    path,
+                    wallet.address,
+                    deadline,
+                    { gasLimit: (await router.estimateGas[swapFunction](amountWei, amountOutMin, path, wallet.address, deadline)).mul(120).div(100) }
+                );
+            }
+
+            const receipt = await tx.wait();
+            if (receipt.status !== 1) {
+                throw new Error(`Swap transaction failed: ${receipt.transactionHash}`);
+            }
+
+            // Hitung token yang diterima
+            let tokensReceived: string;
+            if (tokenOutAddress === TOKEN_LIST.MON) {
+                const balanceAfter = await provider.getBalance(wallet.address);
+                tokensReceived = ethers.utils.formatEther(balanceAfter.sub(balanceBefore));
+            } else {
+                const contract = new ethers.Contract(tokenOutAddress, ERC20_ABI, provider);
+                const decimals = await contract.decimals();
+                const balanceAfter = await contract.balanceOf(wallet.address);
+                tokensReceived = ethers.utils.formatUnits(balanceAfter.sub(balanceBefore), decimals);
+            }
+
+            let outputText = `Successfully swapped ${amount} ${tokenInName} to ${tokensReceived} ${tokenOutName}.\n` +
+                            `Transaction Hash: ${receipt.transactionHash}\n` +
+                            `Slippage: ${effectiveSlippage}%`;
+            if (approvalTxHash) {
+                outputText += `\nApproval Transaction Hash: ${approvalTxHash}`;
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: outputText
+                    },
+                ],
+            };
+        } catch (error: unknown) {
+            console.error(`Swap error: ${error instanceof Error ? error.message : String(error)}`);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Failed to swap tokens. Error: ${error instanceof Error ? error.message : String(error)}`
+                    },
+                ],
+                isError: true
+            };
+        }
+    }
+);
+
 /**
  * Main function to start the MCP server
  * Uses stdio for communication with LLM clients
@@ -1081,6 +1342,7 @@ async function main(): Promise<void> {
     console.error("Current working directory:", process.cwd());
     console.error(`Loaded .env from: ${envPath}`);
     console.error(`Loaded abis from: ${abisPath}`);
+    console.error(`Loaded tokens from: ${tokensPath}`);
     const transport: StdioServerTransport = new StdioServerTransport();
     console.error("Transport created");
     await server.connect(transport);
