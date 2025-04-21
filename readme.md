@@ -22,6 +22,8 @@ This project provides an MCP server for seamless interaction with the Monad test
 | stake-aprmon | Stake your MON tokens in the Apriori staking platform. | `stake 0.1 mon` to stake MON tokens. |
 | unstake-aprmon | Unstake all your MON tokens from the Apriori platform. | `unstake aprmon` to unstake all your staked MON tokens. Note down the request ID, which will be used later for claiming. |
 | claim-aprmon | Claim pending unstaked MON tokens. | After 10 minutes of unstaking, use `claim aprmon requestID`. Replace `requestID` with the ID obtained during the unstaking process. |
+| swap | Integrated Uniswap V2 swap feature for Monad Testnet network | For listed tokens: `swap 0.1 MON to USDT`. For unlisted tokens: `swap 0.1 MON to 0xxxxxxxxxxx` (using contract address) |
+
 ## Quick Start
 
 ```bash
