@@ -26,18 +26,26 @@ This project provides an MCP server for seamless interaction with the Monad test
 
 ## Quick Start
 
+- Clone the repository
 ```bash
-# Clone the repository
 git clone https://github.com/Semutireng22/mcp-monad.git
 cd mcp-monad
-
-# Install dependencies
 npm install
+```
 
-# Create .env file (replace with your private key)
-echo "PRIVATE_KEY=0xyourprivatekeyhere" > .env
 
-# Build and run
+- Copy .env.example to .env and configure it
+```
+cp .env.example .env
+```
+
+- Edit .env with your private key
+```
+nano .env
+```
+
+- Build and run
+```
 npm run build
 node build/index.js
 ```
@@ -48,7 +56,8 @@ node build/index.js
 - npm or yarn
 - Claude Desktop (for MCP Client integration)
 - A Monad testnet wallet with sufficient MON for transactions and gas fees (required for play-coinflip, send-mon, and send-token)
-- A `.env` file with a valid `PRIVATE_KEY` for the Monad testnet wallet
+- A `.env` file configured with:
+`PRIVATE_KEY` for the Monad testnet wallet `Uniswap V2` contract addresses (`UNISWAP_ROUTER_ADDRESS`, `UNISWAP_FACTORY_ADDRESS`) and `WMON` contract address `(WMON_ADDRESS)`
 
 ## Configuration and Usage
 
@@ -70,17 +79,31 @@ const server = new McpServer({
     "send-mon",
     "send-token",
     "play-coinflip",
-    "get-coinflip-history"
+    "get-coinflip-history",
+    "stake-aprmon",
+    "unstake-aprmon",
+    "claim-aprmon",
+    "get-aprmon-balance",
+    "get-aprmon-rate",
+    "get-aprmon-requests",
+    "swap"
   ]
 });
 ```
 
 ### Setting Up the Environment
 
-Create a `.env` file in the project root directory (e.g., `/path/to/mcp-monad/.env`) with the following content:
+To configure the server, copy the example environment file and edit it:
+```
+cp .env.example .env
+```
+Edit the `.env` file with a text editor (e.g., `nano`, `vim`, or `VS Code`) to include the following:
 
 ```env
 PRIVATE_KEY=0xyourprivatekeyhere
+UNISWAP_ROUTER_ADDRESS=0xfb8e1c3b833f9e67a71c859a132cf783b645e436
+UNISWAP_FACTORY_ADDRESS=0x733e88f248b742db6c14c0b1713af5ad7fdd59d0
+WMON_ADDRESS=0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701
 ```
 
 Replace `0xyourprivatekeyhere` with your Monad testnet wallet's private key (64 hexadecimal characters starting with `0x`).
